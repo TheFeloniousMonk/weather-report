@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://d3js.org https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
+  <title>Weather Report Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0f0f1a;
+      --bg-secondary: #1a1a2e;
+      --bg-tertiary: #252542;
+      --bg-hover: #2d2d4a;
+      --text-primary: #e8e8f0;
+      --text-secondary: #a0a0b8;
+      --text-muted: #6a6a80;
+      --accent-blue: #4a9eff;
+      --accent-green: #4ade80;
+      --accent-red: #f87171;
+      --accent-yellow: #fbbf24;
+      --border-color: #3a3a5a;
+      
+      /* Temperature gradient colors */
+      --temp-cold-3: #1e40af;
+      --temp-cold-2: #3b82f6;
+      --temp-cold-1: #93c5fd;
+      --temp-neutral: #f8fafc;
+      --temp-warm-1: #fca5a5;
+      --temp-warm-2: #ef4444;
+      --temp-warm-3: #991b1b;
+
+      /* Dimension colors for line chart */
+      --dim-conflict: #ef4444;
+      --dim-edge-case: #f97316;
+      --dim-tone: #eab308;
+      --dim-filtering: #22c55e;
+      --dim-deployment: #14b8a6;
+      --dim-metacognition: #3b82f6;
+      --dim-elasticity: #8b5cf6;
+      --dim-privacy-safety: #ec4899;
+      --dim-architecture: #6366f1;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Drag region for frameless window */
+    .titlebar {
+      -webkit-app-region: drag;
+      height: 32px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      padding-left: 80px;
+    }
+
+    .titlebar-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 24px 32px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 24px;
+    }
+
+    .header-left h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, var(--accent-blue), #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header-left p {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    /* Buttons */
+    .btn {
+      -webkit-app-region: no-drag;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary {
+      background: var(--accent-blue);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #3b8bef;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-hover);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .card-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Filter Controls */
+    .filter-controls {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .filter-group label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .filter-select {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      color: var(--text-primary);
+      cursor: pointer;
+      min-width: 140px;
+    }
+
+    .filter-select:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+    }
+
+    /* Toggle */
+    .toggle-group {
+      display: flex;
+      background: var(--bg-tertiary);
+      border-radius: 6px;
+      padding: 3px;
+    }
+
+    .toggle-btn {
+      padding: 6px 12px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .toggle-btn.active {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+
+    /* Trend Chart */
+    .trend-chart-container {
+      position: relative;
+      height: 280px;
+      margin-bottom: 16px;
+    }
+
+    .trend-chart {
+      width: 100%;
+      height: 100%;
+    }
+
+    .trend-chart .axis-label {
+      font-size: 11px;
+      fill: var(--text-muted);
+    }
+
+    .trend-chart .axis line,
+    .trend-chart .axis path {
+      stroke: var(--border-color);
+    }
+
+    .trend-chart .axis text {
+      fill: var(--text-muted);
+      font-size: 10px;
+    }
+
+    .trend-chart .grid line {
+      stroke: var(--border-color);
+      stroke-opacity: 0.3;
+    }
+
+    .trend-chart .baseline-band {
+      fill: var(--text-muted);
+      opacity: 0.1;
+    }
+
+    .trend-line {
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .trend-line.dimmed {
+      opacity: 0.15;
+    }
+
+    .trend-dot {
+      cursor: pointer;
+      transition: r 0.15s ease;
+    }
+
+    .trend-dot:hover {
+      r: 6;
+    }
+
+    /* Dimension Legend */
+    .dimension-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 12px 0;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: all 0.15s ease;
+    }
+
+    .legend-item:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .legend-item.dimmed {
+      opacity: 0.4;
+    }
+
+    .legend-item.dimmed .legend-color {
+      background: var(--text-muted) !important;
+    }
+
+    .legend-color {
+      width: 12px;
+      height: 3px;
+      border-radius: 2px;
+    }
+
+    .legend-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    /* Heatmap - Scrollable with sticky labels */
+    .heatmap-scroll-container {
+      position: relative;
+    }
+
+    .heatmap-wrapper {
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-behavior: smooth;
+    }
+
+    .heatmap-wrapper::-webkit-scrollbar {
+      height: 8px;
+    }
+
+    .heatmap-wrapper::-webkit-scrollbar-track {
+      background: var(--bg-tertiary);
+      border-radius: 4px;
+    }
+
+    .heatmap-wrapper::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 4px;
+    }
+
+    .heatmap-wrapper::-webkit-scrollbar-thumb:hover {
+      background: var(--text-muted);
+    }
+
+    .heatmap-table {
+      border-collapse: separate;
+      border-spacing: 4px;
+      width: max-content;
+      min-width: 100%;
+    }
+
+    .heatmap-table th,
+    .heatmap-table td {
+      padding: 0;
+      vertical-align: middle;
+    }
+
+    .heatmap-table td {
+      width: 84px;
+      min-width: 84px;
+      max-width: 84px;
+    }
+
+    .heatmap-table .heatmap-label {
+      position: sticky;
+      left: 0;
+      z-index: 5;
+      background: var(--bg-secondary);
+      width: 140px;
+      min-width: 140px;
+      padding: 12px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-align: left;
+      border: none;
+      box-shadow: 2px 0 4px rgba(0,0,0,0.3);
+    }
+
+    .heatmap-table .session-header-cell {
+      width: 84px;
+      min-width: 84px;
+      max-width: 84px;
+      text-align: center;
+      padding: 8px 2px;
+      vertical-align: bottom;
+    }
+
+    .session-header-inner {
+      width: 80px;
+      max-width: 80px;
+      margin: 0 auto;
+    }
+
+    .heatmap-table thead th {
+      border-bottom: 2px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .heatmap-table thead .heatmap-label {
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    .session-date {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .session-state {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 80px;
+      max-width: 80px;
+      display: block;
+    }
+
+    .session-total {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-blue);
+      margin-top: 4px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .heatmap-cell {
+      width: 80px;
+      min-width: 80px;
+      max-width: 80px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+      margin: 0 auto;
+    }
+
+    .heatmap-cell:hover {
+      transform: scale(1.05);
+      z-index: 10;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .heatmap-cell .delta {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 9px;
+      font-weight: 500;
+      opacity: 0.8;
+    }
+
+    .delta.positive { color: #22c55e; }
+    .delta.negative { color: #ef4444; }
+    .delta.neutral { color: var(--text-muted); }
+
+    /* Sparkline */
+    .sparkline-cell {
+      width: 72px;
+      min-width: 72px;
+      padding-left: 12px;
+    }
+
+    .sparkline-container {
+      width: 60px;
+      height: 24px;
+    }
+
+    .sparkline path {
+      fill: none;
+      stroke: var(--accent-blue);
+      stroke-width: 1.5;
+    }
+
+    /* Detail heatmap specifics */
+    .heatmap-table .dimension-header {
+      background: var(--bg-tertiary);
+      font-weight: 600;
+      color: var(--text-primary);
+      padding-top: 16px;
+    }
+
+    .heatmap-table .question-label {
+      padding-left: 24px;
+      font-size: 12px;
+    }
+
+    .heatmap-table .question-cell {
+      height: 36px;
+    }
+
+    /* File picker section */
+    .file-picker-section {
+      display: flex;
+      gap: 16px;
+      align-items: flex-end;
+    }
+
+    .file-input-group {
+      flex: 1;
+    }
+
+    .file-input-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .file-path {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 10px 12px;
+    }
+
+    .file-path-text {
+      flex: 1;
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-path-text.has-file {
+      color: var(--text-primary);
+    }
+
+    /* Processing status */
+    .processing-status {
+      margin-top: 16px;
+      padding: 16px;
+      background: var(--bg-tertiary);
+      border-radius: 8px;
+      display: none;
+    }
+
+    .processing-status.visible {
+      display: block;
+    }
+
+    .processing-status.success {
+      border-left: 3px solid var(--accent-green);
+    }
+
+    .processing-status.error {
+      border-left: 3px solid var(--accent-red);
+    }
+
+    .processing-output {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding: 16px;
+      background: var(--bg-tertiary);
+      border-radius: 8px;
+      margin-top: 16px;
+    }
+
+    .legend-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .legend-gradient {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .legend-bar {
+      width: 200px;
+      height: 16px;
+      border-radius: 4px;
+      background: linear-gradient(to right, 
+        var(--temp-cold-3) 0%,
+        var(--temp-cold-2) 20%,
+        var(--temp-cold-1) 35%,
+        var(--temp-neutral) 50%,
+        var(--temp-warm-1) 65%,
+        var(--temp-warm-2) 80%,
+        var(--temp-warm-3) 100%
+      );
+    }
+
+    /* Detail panel */
+    .detail-panel {
+      position: fixed;
+      right: -400px;
+      top: 32px;
+      bottom: 0;
+      width: 400px;
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border-color);
+      padding: 24px;
+      overflow-y: auto;
+      transition: right 0.3s ease;
+      z-index: 100;
+    }
+
+    .detail-panel.open {
+      right: 0;
+    }
+
+    .detail-panel-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 20px;
+    }
+
+    .detail-panel h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+
+    .detail-panel .session-meta {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+
+    .detail-section {
+      margin-bottom: 24px;
+    }
+
+    .detail-section h4 {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    .detail-section p {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    /* Question detail grid */
+    .question-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+    }
+
+    .question-cell {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-state h3 {
+      font-size: 18px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    /* Tooltip */
+    .tooltip {
+      position: fixed;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      max-width: 300px;
+    }
+
+    .tooltip.visible {
+      opacity: 1;
+    }
+
+    .tooltip-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .tooltip-value {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent-blue);
+    }
+
+    /* Settings indicator */
+    .csv-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .csv-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-red);
+    }
+
+    .csv-status-dot.connected {
+      background: var(--accent-green);
+    }
+
+    /* Collapsible card */
+    .card-collapsible .card-header {
+      cursor: pointer;
+    }
+
+    .card-collapsible .card-header:hover {
+      opacity: 0.8;
+    }
+
+    .card-collapsible .card-content {
+      max-height: 500px;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .card-collapsible.collapsed .card-content {
+      max-height: 0;
+    }
+
+    .collapse-icon {
+      transition: transform 0.3s ease;
+    }
+
+    .card-collapsible.collapsed .collapse-icon {
+      transform: rotate(-90deg);
+    }
+  </style>
+</head>
+<body>
+  <div class="titlebar">
+    <span class="titlebar-title">Weather Report Dashboard</span>
+  </div>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <h1>Weather Report</h1>
+        <p>LLM Session Diagnostic Tracker</p>
+      </div>
+      <div class="header-actions">
+        <div class="csv-status" id="csvStatus">
+          <span class="csv-status-dot" id="csvStatusDot"></span>
+          <span id="csvStatusText">No CSV loaded</span>
+        </div>
+        <button class="btn btn-secondary" id="btnSelectCSV">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          Select CSV
+        </button>
+      </div>
+    </header>
+
+    <!-- Trend Chart Section (NEW - moved to top) -->
+    <div class="card" id="trendChartCard">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Trend Analysis</h2>
+          <p class="card-subtitle">Dimension trajectories over time (60-70% baseline band)</p>
+        </div>
+        <div class="filter-controls">
+          <div class="filter-group">
+            <label>Sessions</label>
+            <select class="filter-select" id="sessionCountFilter">
+              <option value="25" selected>Last 25</option>
+              <option value="50">Last 50</option>
+              <option value="100">Last 100</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Dimension</label>
+            <select class="filter-select" id="dimensionFilter">
+              <option value="all" selected>All Dimensions</option>
+              <option value="conflict">Conflict</option>
+              <option value="edge_case">Edge Case</option>
+              <option value="tone">Tone</option>
+              <option value="filtering">Filtering</option>
+              <option value="deployment">Deployment</option>
+              <option value="metacognition">Metacognition</option>
+              <option value="elasticity">Elasticity</option>
+              <option value="privacy_safety">Privacy/Safety</option>
+              <option value="architecture">Architecture</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>System State</label>
+            <select class="filter-select" id="systemStateFilter">
+              <option value="all" selected>All States</option>
+              <!-- Options populated dynamically -->
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div id="trendVisualizationContainer">
+        <div class="empty-state" id="trendEmptyState">
+          <div class="empty-state-icon">📈</div>
+          <h3>No data loaded</h3>
+          <p>Select a CSV file to visualize trends</p>
+        </div>
+
+        <div id="trendChartContainer" style="display: none;">
+          <div class="trend-chart-container">
+            <svg class="trend-chart" id="trendChart"></svg>
+          </div>
+          <div class="dimension-legend" id="dimensionLegend"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Heatmap Section -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Dimension Overview</h2>
+          <p class="card-subtitle">Percentage scores across sessions (centered at 60%)</p>
+        </div>
+        <div class="toggle-group">
+          <button class="toggle-btn active" data-view="summary">Summary</button>
+          <button class="toggle-btn" data-view="detail">Questions</button>
+        </div>
+      </div>
+
+      <div id="visualizationContainer">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-state-icon">📊</div>
+          <h3>No data loaded</h3>
+          <p>Select a CSV file to visualize weather report data</p>
+        </div>
+
+        <div id="heatmapContainer" style="display: none;">
+          <!-- Summary Heatmap with scrolling -->
+          <div class="heatmap-scroll-container" id="summaryHeatmapContainer">
+            <div class="heatmap-wrapper" id="summaryHeatmapWrapper">
+              <div class="heatmap-scrollable">
+                <div class="heatmap" id="summaryHeatmap"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Detail Heatmap with scrolling -->
+          <div class="heatmap-scroll-container" id="detailHeatmapContainer" style="display: none;">
+            <div class="heatmap-wrapper" id="detailHeatmapWrapper">
+              <div class="heatmap-scrollable">
+                <div class="heatmap" id="detailHeatmap"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <span class="legend-title">Temperature Scale</span>
+        <div class="legend-gradient">
+          <span style="font-size: 11px; color: var(--text-muted);">Cold (≤40%)</span>
+          <div class="legend-bar"></div>
+          <span style="font-size: 11px; color: var(--text-muted);">Hot (≥80%)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import Section (MOVED to bottom) -->
+    <div class="card card-collapsible" id="importCard">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Import Weather Report</h2>
+          <p class="card-subtitle">Select a markdown file to process and add to the dataset</p>
+        </div>
+        <svg class="collapse-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </div>
+      
+      <div class="card-content">
+        <div class="file-picker-section">
+          <div class="file-input-group">
+            <label>Report File</label>
+            <div class="file-path">
+              <span class="file-path-text" id="selectedFilePath">No file selected</span>
+              <button class="btn btn-secondary" id="btnSelectFile" style="padding: 6px 12px; font-size: 12px;">
+                Browse
+              </button>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="btnProcess" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16 16 12 12 8 16"/>
+              <line x1="12" y1="12" x2="12" y2="21"/>
+              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+            </svg>
+            Process & Import
+          </button>
+        </div>
+
+        <div class="processing-status" id="processingStatus">
+          <pre class="processing-output" id="processingOutput"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Panel (slides in from right) -->
+  <div class="detail-panel" id="detailPanel">
+    <button class="detail-panel-close" id="closeDetailPanel">×</button>
+    <h3 id="detailPanelTitle">Session Details</h3>
+    <div class="session-meta" id="detailPanelMeta"></div>
+    
+    <div class="detail-section" id="detailQuestionsSection">
+      <h4>Question Scores</h4>
+      <div class="question-grid" id="detailQuestionGrid"></div>
+    </div>
+
+    <div class="detail-section" id="detailConstraintsSection">
+      <h4>Constraints Observed</h4>
+      <p id="detailConstraints"></p>
+    </div>
+
+    <div class="detail-section" id="detailInterpretationSection">
+      <h4>Interpretation Notes</h4>
+      <p id="detailInterpretation"></p>
+    </div>
+  </div>
+
+  <!-- Tooltip -->
+  <div class="tooltip" id="tooltip">
+    <div class="tooltip-title" id="tooltipTitle"></div>
+    <div class="tooltip-value" id="tooltipValue"></div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
