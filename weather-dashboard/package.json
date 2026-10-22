@@ -33,7 +33,7 @@
       {
         "from": "python/",
         "to": "python/",
-        "filter": ["**/*"]
+        "filter": ["*.py"]
       }
     ],
     "directories": {
